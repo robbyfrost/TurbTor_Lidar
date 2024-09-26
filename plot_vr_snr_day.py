@@ -132,7 +132,7 @@ for filename in sorted(os.listdir(directory)):
             vmin, vmax = -10, 10
             pcm1 = ax[0].pcolormesh(XX.T/1e3, YY.T/1e3, l['vr'],
                                     vmin=vmin, vmax=vmax,
-                                    cmap="pyart_NWSVel")
+                                    cmap="pyart_Carbone42")
             ax[0].set_title("Radial Velocity")
             cbar1 = fig.colorbar(pcm1, ax=ax[0], aspect=20, pad=0.03, fraction=0.06, shrink=0.81)
             cbar1.set_label("$V_r$ [m s$^{-1}$]")

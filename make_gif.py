@@ -5,7 +5,7 @@ import os
 des_elev = 5
 input_folder = "/home/robbyfrost/Analysis/TurbTor_Lidar/figures/ARRC_Truck/2024/09/24/"
 os.makedirs(input_folder, exist_ok=True)
-output_gif = f"GIF_vr_vort_PPI_el{des_elev}_23z.gif"
+output_gif = f"GIF_vr_vort_PPI_el{des_elev}_19z.gif"
 dout = input_folder + output_gif
 duration = 200
 step = 1 # only include figures every step
@@ -25,7 +25,7 @@ def create_gif(input_folder, dout, duration, step):
     file_list = sorted(os.listdir(input_folder))
     selected_files = file_list[::step]  # Select every nth file
     for file_name in selected_files:
-        if file_name.startswith('vr_vortz_PPI_el5_2024092423'):
+        if file_name.startswith('vr_vortz_PPI_el5_2024092419'):
             file_path = os.path.join(input_folder, file_name)
             images.append(imageio.imread(file_path))
     
