@@ -29,12 +29,13 @@ import zstandard as zstd
 
 # date/time info of lidar scans
 des_year = "2024"
-des_mon = "09"
-des_day = "24"
-des_sys = "ARRC_Truck" # WG100-L0AD00003JP, WG100-L0AD00004JP, or ARRC_Truck
+des_mon = "10"
+des_day = "30"
+des_sys = "ARRC" # WG100-L0AD00003JP, WG100-L0AD00004JP, or ARRC
 lidar_loc = "ARRC Mobile" # Hampton, VA or Oklahoma Mobile
 # directory storing 24 hours of lidar data
-directory = f"/data/arrcwx/robbyfrost/lidar_obs/{des_sys}/{des_year}/{des_mon}/{des_day}/"
+# directory = f"/data/arrcwx/robbyfrost/lidar_obs/{des_sys}/{des_year}/{des_mon}/{des_day}/"
+directory = f"/data/arrcwx/MetroWeather/{des_sys}/{des_year}/{des_mon}/{des_year}{des_mon}{des_day}/"
 # directory for saving figues
 figdir = f"/home/robbyfrost/Analysis/TurbTor_Lidar/figures/{des_sys}/{des_year}/{des_mon}/{des_day}/"
 os.makedirs(figdir, exist_ok=True)
@@ -44,7 +45,7 @@ des_elev = 5.
 # offset in meters where data begins
 range_offset = 1425
 # max range for PPI plots in km
-rmax = 10
+rmax = 15
 
 # plotting set up
 plt.rcParams['axes.labelweight'] = 'normal'

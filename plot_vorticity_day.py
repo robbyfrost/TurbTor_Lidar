@@ -19,19 +19,22 @@ from matplotlib import rc
 import pyart
 from matplotlib.ticker import MultipleLocator
 import zstandard as zstd
+import io
 from make_gif import create_gif
+import zstandard as zstd
 
 # --------------------------
 # settings
 
 # date/time info of lidar scans
 des_year = "2024"
-des_mon = "09"
-des_day = "24"
-des_sys = "ARRC_Truck" # WG100-L0AD00003JP, WG100-L0AD00004JP, or ARRC_Truck
+des_mon = "11"
+des_day = "03"
+des_sys = "ARRC" # WG100-L0AD00003JP, WG100-L0AD00004JP, or ARRC
 lidar_loc = "ARRC Mobile" # Hampton, VA or Oklahoma Mobile
 # directory storing 24 hours of lidar data
-directory = f"/data/arrcwx/robbyfrost/lidar_obs/{des_sys}/{des_year}/{des_mon}/{des_day}/"
+# directory = f"/data/arrcwx/robbyfrost/lidar_obs/{des_sys}/{des_year}/{des_mon}/{des_day}/"
+directory = f"/data/arrcwx/MetroWeather/{des_sys}/{des_year}/{des_mon}/{des_year}{des_mon}{des_day}/"
 # directory for saving figues
 figdir = f"/home/robbyfrost/Analysis/TurbTor_Lidar/figures/{des_sys}/{des_year}/{des_mon}/{des_day}/"
 os.makedirs(figdir, exist_ok=True)
@@ -41,7 +44,7 @@ des_elev = 5.
 # offset in meters where data begins
 range_offset = 1425
 # max range for PPI plots in km
-rmax = 5
+rmax = 12.5
 
 # plotting set up
 plt.rcParams['axes.labelweight'] = 'normal'
@@ -53,128 +56,133 @@ rc('figure', facecolor='white')
 # --------------------------
 # read in lidar files
 
-# Initialize an empty list to store the datasets
-lall = []
+# # Initialize an empty list to store the datasets
+# lall = []
 
-# Iterate through all files in the directory
-for filename in sorted(os.listdir(directory)):
-    if filename.endswith(".nc"):
-        file_path = os.path.join(directory, filename)
-        # Open each .nc.gz file and load it as an xarray Dataset
-        # with gzip.open(file_path, 'rb') as f:
-        ds = xr.open_dataset(file_path)
-        try:
-            ds = ds.where(ds.elevation == des_elev, drop=True)
-        except ValueError:
-            continue
-    
-        # check scan is good
-        if (ds.ntime.size > 100) and (ds.nrange.size > 100) and (ds.elevation[0].data > des_elev-1. and ds.elevation[0].data < des_elev+1.):
-            print(f"Reading {filename}")
-            # oversampling_ratio = ds.attrs['oversampling_ratio']  
-            start_point = np.argmin(abs(ds.ranges[:,0].data-range_offset))+1
-            # set arrays for calculation simplicity
-            r = ds.ranges[start_point:,0].data - range_offset
-            az = ds.azimuth.data
-            el = ds.elevation.data
-            vr = ds.dpl[:,0,start_point:].data
-            # calculate vertical vorticity
-            vort_z = ( (vr[1:,:] - vr[:-1,:]) / (np.deg2rad(az[1:]) - np.deg2rad(az[:-1]))[:,np.newaxis] ) * (1 / r)
-            
-            # create dictionary to store lidar file
-            lidar = {
-                # lidar information
-                'ob_method' : ds.attrs['observation_method'],
-                'serial_number' : ds.attrs['serial_number'],
-                'lat' : ds.latitude.data,
-                'lon' : ds.longitude.data,
-                'altitude' : ds.altitude.data,
-                # scan setting information
-                'rpm_azimuth' : ds.rpm_azimuth[start_point:].data,
-                # scan dimensions
-                'r' : r,
-                'az' : az,
-                'el' : el,
-                # important observations
-                'vr' : vr,
-                'vort_z' : vort_z,
-                'pwr' : ds.pwr[:,0,start_point:].data * 100,
-                'snr' : ds.snr[:,0,start_point:].data,
-                'sw' : ds.wth[:,0,start_point:].data,
-                # other observations
-                'noise_level' : ds.noise_level[:,0,start_point:].data,
-                # 'power_spectra' : ds.power_spectra[:,0,start_point:].data,
-                'doppler_velocity' : ds.doppler_velocity.data,
-                # scan time information
-                'record_start_time' : ds.start_time.data,
-                'start_time' : ds.attrs['start_time'][11:19],
-                'start_date' : ds.attrs['start_time'][:10],
-                'end_time' : ds.attrs['end_time'][11:19],
-                'end_date' : ds.attrs['end_time'][:10]
-                    }
-            
-            # lall.append(lidar)
-            ds.close()
+# # Iterate through all files in the directory
+# for filename in sorted(os.listdir(directory)):
+#     if filename.endswith(".nc.zst"):
+#         file_path = os.path.join(directory, filename)
+#         with open(file_path, 'rb') as compressed_file:
+#             decompressor = zstd.ZstdDecompressor()
+#             # Decompress into memory
+#             try:
+#                 decompressed_data = decompressor.decompress(compressed_file.read())
+#             except zstd.ZstdError:
+#                 continue
+#             # Create a file-like object from bytes
+#             file_like_obj = io.BytesIO(decompressed_data)
+#             # with xr.open_dataset(decompressed_data, engine='h5netcdf') as ds:
+#             ds = xr.open_dataset(file_like_obj, engine='h5netcdf')
 
-            # --------------------------
-            # make plots
+#             try:
+#                 ds = ds.where(ds.elevation == des_elev, drop=True)
+#             except ValueError:
+#                 continue
+        
+#             # check scan is good
+#             if (ds.ntime.size > 100) and (ds.nrange.size > 100) and (ds.elevation[0].data > des_elev-1. and ds.elevation[0].data < des_elev+1.):
+#                 print(f"Reading {filename}")
+#                 # oversampling_ratio = ds.attrs['oversampling_ratio']  
+#                 start_point = np.argmin(abs(ds.ranges[:,0].data-range_offset))+1
+#                 # set arrays for calculation simplicity
+#                 r = ds.ranges[start_point:,0].data - range_offset
+#                 az = ds.azimuth.data
+#                 el = ds.elevation.data
+#                 vr = ds.dpl[:,0,start_point:].data
+#                 # calculate vertical vorticity
+#                 vort_z = ( (vr[1:,:] - vr[:-1,:]) / (np.deg2rad(az[1:]) - np.deg2rad(az[:-1]))[:,np.newaxis] ) * (1 / r)
+                
+#                 # create dictionary to store lidar file
+#                 lidar = {
+#                     # lidar information
+#                     'ob_method' : ds.attrs['observation_method'],
+#                     'serial_number' : ds.attrs['serial_number'],
+#                     'lat' : ds.latitude.data,
+#                     'lon' : ds.longitude.data,
+#                     'altitude' : ds.altitude.data,
+#                     # scan setting information
+#                     'rpm_azimuth' : ds.rpm_azimuth[start_point:].data,
+#                     # scan dimensions
+#                     'r' : r,
+#                     'az' : az,
+#                     'el' : el,
+#                     # important observations
+#                     'vr' : vr,
+#                     'vort_z' : vort_z,
+#                     'pwr' : ds.pwr[:,0,start_point:].data * 100,
+#                     'snr' : ds.snr[:,0,start_point:].data,
+#                     'sw' : ds.wth[:,0,start_point:].data,
+#                     # other observations
+#                     'noise_level' : ds.noise_level[:,0,start_point:].data,
+#                     # 'power_spectra' : ds.power_spectra[:,0,start_point:].data,
+#                     'doppler_velocity' : ds.doppler_velocity.data,
+#                     # scan time information
+#                     'record_start_time' : ds.start_time.data,
+#                     'start_time' : ds.attrs['start_time'][11:19],
+#                     'start_date' : ds.attrs['start_time'][:10],
+#                     'end_time' : ds.attrs['end_time'][11:19],
+#                     'end_date' : ds.attrs['end_time'][:10]
+#                         }
+                
+#                 # lall.append(lidar)
+#                 ds.close()
 
-            # iterate over lidar scans
-            # for i, l in enumerate(lall):
-            l = lidar
-            # cartesian stuff for plotting
-            XX, YY = dis_angle_to_2Dxy(l['r'], north0_to_arctheta(l['az']))
+#             # --------------------------
+#             # make plots
 
-            # create plot
-            print("Making plot")
-            fig, ax = plt.subplots(figsize=(20,10), ncols=2)
-            # plot radial velocity
-            vmin, vmax = -10, 10
-            pcm1 = ax[0].pcolormesh(XX.T/1e3, YY.T/1e3, l['vr'],
-                                    vmin=vmin, vmax=vmax,
-                                    cmap="pyart_Carbone42")
-            ax[0].set_title("Radial Velocity")
-            cbar1 = fig.colorbar(pcm1, ax=ax[0], aspect=20, pad=0.03, fraction=0.06, shrink=0.755)
-            cbar1.set_label("$V_r$ [m s$^{-1}$]")
-            cbar1.set_ticks(np.arange(vmin, vmax+0.001, 5))
-            # plot vertical vorticity
-            vmin, vmax = -0.05, 0.05
-            pcm2 = ax[1].pcolormesh(XX.T[:-1]/1e3, YY.T[:-1]/1e3, l['vort_z'],
-                                    vmin=vmin, vmax=vmax,
-                                    cmap="RdBu")
-            ax[1].set_title("Inferred Vertical Vorticity")
-            cbar2 = fig.colorbar(pcm2, ax=ax[1], aspect=20, pad=0.03, fraction=0.06, shrink=0.755)
-            cbar2.set_label("$\\zeta$ [s$^{-1}$]")
-            cbar2.set_ticks(np.arange(vmin, vmax+0.0001, 0.025))
-            # stuff for both axes
-            for iax in ax:
-                iax.set_aspect('equal')
-                iax.set_xlim(-rmax,rmax)
-                iax.xaxis.set_major_locator(MultipleLocator(5))
-                iax.xaxis.set_minor_locator(MultipleLocator(1))
-                iax.set_xlabel("Zonal Distance [km]")
-                iax.set_ylim(-rmax,rmax)
-                iax.yaxis.set_major_locator(MultipleLocator(5))
-                iax.yaxis.set_minor_locator(MultipleLocator(1))
-                iax.set_ylabel("Meridional Distance [km]")
+#             # iterate over lidar scans
+#             # for i, l in enumerate(lall):
+#             l = lidar
+#             # cartesian stuff for plotting
+#             XX, YY = dis_angle_to_2Dxy(l['r'], north0_to_arctheta(l['az']))
 
-            plt.suptitle(f"{lidar_loc} MetroWeather CDL {l['start_date']} {l['start_time']} UTC ({round(l['el'][0],1)}$^{{\\circ}}$ Elevation)", 
-                        fontweight="bold", fontsize=25, y=0.925)
-            fig.tight_layout()
+#             # create plot
+#             print("Making plot")
+#             fig, ax = plt.subplots(figsize=(20,10), ncols=2)
+#             # plot radial velocity
+#             vmin, vmax = -20, 20
+#             pcm1 = ax[0].pcolormesh(XX.T/1e3, YY.T/1e3, l['vr'],
+#                                     vmin=vmin, vmax=vmax,
+#                                     cmap="pyart_Carbone42")
+#             ax[0].set_title("Radial Velocity")
+#             cbar1 = fig.colorbar(pcm1, ax=ax[0], aspect=20, pad=0.03, fraction=0.06, shrink=0.755)
+#             cbar1.set_label("$V_r$ [m s$^{-1}$]")
+#             cbar1.set_ticks(np.arange(vmin, vmax+0.001, 5))
+#             # plot vertical vorticity
+#             vmin, vmax = -0.05, 0.05
+#             pcm2 = ax[1].pcolormesh(XX.T[:-1]/1e3, YY.T[:-1]/1e3, l['vort_z'],
+#                                     vmin=vmin, vmax=vmax,
+#                                     cmap="RdBu")
+#             ax[1].set_title("Inferred Vertical Vorticity")
+#             cbar2 = fig.colorbar(pcm2, ax=ax[1], aspect=20, pad=0.03, fraction=0.06, shrink=0.755)
+#             cbar2.set_label("$\\zeta$ [s$^{-1}$]")
+#             cbar2.set_ticks(np.arange(vmin, vmax+0.0001, 0.025))
+#             # stuff for both axes
+#             for iax in ax:
+#                 iax.set_aspect('equal')
+#                 iax.set_xlim(-rmax,rmax)
+#                 iax.xaxis.set_major_locator(MultipleLocator(5))
+#                 iax.xaxis.set_minor_locator(MultipleLocator(1))
+#                 iax.set_xlabel("Zonal Distance [km]")
+#                 iax.set_ylim(-rmax,rmax)
+#                 iax.yaxis.set_major_locator(MultipleLocator(5))
+#                 iax.yaxis.set_minor_locator(MultipleLocator(1))
+#                 iax.set_ylabel("Meridional Distance [km]")
 
-            time_str = l['start_date'].replace("-","") + l['start_time'].replace(":","")
-            dout = f"{figdir}vr_vortz_PPI_el{int(l['el'][0])}_{time_str}.png"
-            print(f"Saving to {dout}")
-            plt.savefig(dout)
+#             plt.suptitle(f"{lidar_loc} MetroWeather CDL {l['start_date']} {l['start_time']} UTC ({round(l['el'][0],1)}$^{{\\circ}}$ Elevation)", 
+#                         fontweight="bold", fontsize=25, y=0.925)
+#             fig.tight_layout()
 
+#             time_str = l['start_date'].replace("-","") + l['start_time'].replace(":","")
+#             dout = f"{figdir}vr_vortz_PPI_el{int(l['el'][0])}_{time_str}.png"
+#             print(f"Saving to {dout}")
+#             plt.savefig(dout)
 
 # --------------------------
 # make a gif
-des_elev = 5
-input_folder = "/home/robbyfrost/Analysis/TurbTor_Lidar/figures/ARRC_Truck/2024/09/24/"
-os.makedirs(input_folder, exist_ok=True)
-output_gif = f"GIF_vr_vort_PPI_{des_elev}.gif"
-dout = input_folder + output_gif
-duration = 500
-step = 1 # only include figures every step
-create_gif(input_folder, dout, duration, step)
+naming_con = "vr_vortz_PPI_el"
+dout = f"{figdir}GIF_vr_vort_PPI_{des_elev}.gif"
+duration = 100
+step = 3 # only include figures every step
+create_gif(naming_con, figdir, dout, duration, step)

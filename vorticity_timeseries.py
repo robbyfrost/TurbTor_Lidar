@@ -10,30 +10,35 @@
 import matplotlib.pyplot as plt
 import numpy as np
 import xarray as xr
-import gzip
 import os
 from functions import *
 import matplotlib.pyplot as plt
 from matplotlib import rc
-import pyart
 from matplotlib.ticker import MultipleLocator
 from datetime import datetime
 import matplotlib.dates as mdates
+import zstandard as zstd
+import io
 
 #%% --------------------------
 # settings
 
 # date/time info of lidar scans
 des_year = '2024'
-des_mon = '09'
-des_day = "24"
-des_sys = "ARRC_Truck" # WG100-L0AD00003JP, WG100-L0AD00004JP, or ARRC_Truck
+des_mon = '11'
+des_day = "04"
+des_sys = "ARRC" # WG100-L0AD00003JP, WG100-L0AD00004JP, or ARRC
 lidar_loc = "ARRC Mobile" # Hampton, VA or Oklahoma Mobile
 # directory storing 24 hours of lidar data
-directory = f"/data/arrcwx/robbyfrost/lidar_obs/{des_sys}/{des_year}/{des_mon}/{des_day}/"
+# directory = f"/data/arrcwx/robbyfrost/lidar_obs/{des_sys}/{des_year}/{des_mon}/{des_day}/"
+directory = f"/data/arrcwx/MetroWeather/{des_sys}/{des_year}/{des_mon}/{des_year}{des_mon}{des_day}/"
+print(directory)
 # directory for saving figues
 figdir = f"/home/robbyfrost/Analysis/TurbTor_Lidar/figures/{des_sys}/{des_year}/{des_mon}/{des_day}/"
 os.makedirs(figdir, exist_ok=True)
+# directory for saving time series data
+ncout = f"/data/arrcwx/robbyfrost/lidar_obs/{des_sys}/{des_year}/{des_mon}/{des_day}/"
+os.makedirs(ncout, exist_ok=True)
 
 # desired elevation angle
 des_elev = 5.
@@ -41,6 +46,9 @@ des_elev = 5.
 range_offset = 1425
 # start and end azimuths for averaging
 az_start, az_end = 293.925, 358.99
+# az_start, az_end = 0, 360
+# snr value to exclude data
+snr_cut = -10
 
 # plotting set up
 plt.rcParams['axes.labelweight'] = 'normal'
@@ -57,15 +65,28 @@ lall = []
 
 # Iterate through all files in the directory
 for filename in sorted(os.listdir(directory)):
-    if filename.endswith(".nc"):
+    if filename.endswith(".nc.zst"):
         file_path = os.path.join(directory, filename)
-        # Open each .nc.gz file and load it as an xarray Dataset
-        # with gzip.open(file_path, 'rb') as f:
-        ds = xr.open_dataset(file_path)
-        try:
-            ds = ds.where(ds.elevation == des_elev, drop=True)
-        except ValueError:
-            continue
+        with open(file_path, 'rb') as compressed_file:
+            decompressor = zstd.ZstdDecompressor()
+            # Decompress into memory
+            try:
+                decompressed_data = decompressor.decompress(compressed_file.read())
+            except zstd.ZstdError:
+                print(f"Skipping {file_path} because of ZstdError")
+                continue
+            # Create a file-like object from bytes
+            file_like_obj = io.BytesIO(decompressed_data)
+            # with xr.open_dataset(decompressed_data, engine='h5netcdf') as ds:
+            ds = xr.open_dataset(file_like_obj, engine='h5netcdf')
+            # filter out data with low snr
+            good_snr = 10 * np.log10(ds.snr-1)
+            ds['dpl'] = ds.dpl.where(good_snr > snr_cut)
+            # extract desired elevation
+            try:
+                ds = ds.where(ds.elevation == des_elev, drop=True)
+            except ValueError:
+                continue
     
         # check scan is good
         if (ds.ntime.size > 100) and (ds.nrange.size > 100) and (ds.elevation[0].data > des_elev-1. and ds.elevation[0].data < des_elev+1.):
@@ -78,8 +99,9 @@ for filename in sorted(os.listdir(directory)):
             az = ds.azimuth.data
             el = ds.elevation.data
             vr = ds.dpl[:,0,start_point:].data
+            vr_smoothed = xr.DataArray(vr, dims=("az","r"), coords={'az': az, 'r': r}).rolling(az=3,r=3).mean().values
             # calculate vertical vorticity
-            vort_z = ( (vr[1:,:] - vr[:-1,:]) / (np.deg2rad(az[1:]) - np.deg2rad(az[:-1]))[:,np.newaxis] ) * (1 / r)
+            vort_z = ( (vr_smoothed[1:,:] - vr_smoothed[:-1,:]) / (np.deg2rad(az[1:]) - np.deg2rad(az[:-1]))[:,np.newaxis] ) * (1 / r)
             
             # create dictionary to store lidar file
             lidar = {
@@ -115,7 +137,7 @@ for filename in sorted(os.listdir(directory)):
             
             lall.append(lidar)
             ds.close()
-
+print("Finished reading in all lidar files")
 #%% --------------------------
 # create timeseries of averaged zeta
 
@@ -135,9 +157,19 @@ for i, l in enumerate(lall):
     time_list.append(datetime.strptime(f"{l['start_date']} {l['start_time']}", '%Y-%m-%d %H:%M:%S'))
 # convert time to array
 time_array = np.array(time_list)
-# filter out extreme zeta values above 0.1
-# vort_ts = np.where(vort_ts > 1, np.nan, vort_ts) # TODO: Make this remove scans where small area of data are captured instead
-print(vort_ts)
+# filter out extreme zeta values above 1
+vort_ts = np.where(vort_ts > 1, np.nan, vort_ts) # TODO: Make this remove scans where small area of data are captured instead
+# print(vort_ts)
+
+# create xarray data array
+vort_ts_xr = xr.DataArray(vort_ts,
+                          coords={'time' : time_array},
+                          dims="time")
+# output time series to netcdf
+dout = f"{ncout}vort_timeseries_el{int(des_elev)}.nc"
+vort_ts_xr.to_netcdf(dout)
+print(f"Output time series to: {dout}")
+
 #%% --------------------------
 # plot timeseries of averaged zeta
 
@@ -149,10 +181,11 @@ ax.set_xlabel("Time [UTC]")
 plt.xticks(rotation=45)
 ax.xaxis.set_major_formatter(mdates.DateFormatter("%H:%M"))
 ax.set_ylabel("$|\\zeta|$ [s$^{-1}$]")
-ax.set_title(f"{lidar_loc} MetroWeather CDL {des_year}-{des_mon}-{des_day} ({round(l['el'][0],1)}$^{{\circ}}$ Elevation)",
+ax.set_title(f"{lidar_loc} MetroWeather CDL {des_year}-{des_mon}-{des_day} ({round(l['el'][0],1)}$^{{\\circ}}$ Elevation)",
              fontweight="bold")
 
 plt.tight_layout()
 
 plt.show()
 plt.savefig(f"{figdir}{des_year}{des_mon}{des_day}_vort_timeseries.png")
+# %%

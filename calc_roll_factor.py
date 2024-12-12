@@ -20,24 +20,24 @@ from functions import *
 # settings
 
 # date/time info of lidar scans
-des_year = "2023"
-des_mon = "10"
-des_day = "07"
-des_sys = "WG100-L0AD00004JP"
-lidar_loc = "Hampton, VA" # Hampton, VA or Oklahoma Mobile
+des_year = "2024"
+des_mon = "09"
+des_day = "24"
+des_sys = "ARRC_Truck"
+lidar_loc = "ARRC Mobile" # Hampton, VA or Oklahoma Mobile
 # directory storing 24 hours of lidar data
-# directory = f"/data/arrcwx/robbyfrost/lidar_obs/{des_sys}/{des_year}/{des_mon}/{des_day}/"
-directory = "/data/arrcwx/robbyfrost/lidar_obs/test_data/"
+directory = f"/data/arrcwx/robbyfrost/lidar_obs/{des_sys}/{des_year}/{des_mon}/{des_day}/"
+# directory = "/data/arrcwx/robbyfrost/lidar_obs/test_data/"
 # directory for saving figues
-# figdir = f"/home/robbyfrost/analysis/TurbTor_Lidar/figures/{des_sys}/{des_year}/{des_mon}/{des_day}/"
-figdir = f"/home/robbyfrost/analysis/TurbTor_Lidar/figures/test_data/"
+figdir = f"/home/robbyfrost/Analysis/TurbTor_Lidar/figures/{des_sys}/{des_year}/{des_mon}/{des_day}/"
+# figdir = f"/home/robbyfrost/analysis/TurbTor_Lidar/figures/test_data/"
 os.makedirs(figdir, exist_ok=True)
 
 # flag to filter vort_z field
 filter_vort = True
 
 # desired elevation angle
-des_elev = 0.
+des_elev = 5.
 # offset in meters where data begins
 range_offset = 1425
 
@@ -48,60 +48,60 @@ range_offset = 1425
 lall = []
 # Iterate through all files in the directory
 for filename in sorted(os.listdir(directory)):
-    if filename.endswith("PPI_1.nc.gz"):
+    if filename.endswith(".nc"):
         file_path = os.path.join(directory, filename)
         # Open each .nc.gz file and load it as an xarray Dataset
-        with gzip.open(file_path, 'rb') as f:
-            ds = xr.open_dataset(f)
-        
-            # check scan is good
-            if (ds.ntime.size > 100) and (ds.nrange.size > 100) and (ds.elevation[0].data > des_elev-1. and ds.elevation[0].data < des_elev+1.):
-                print(f"Reading {filename}")
-                # oversampling_ratio = ds.attrs['oversampling_ratio']  
-                start_point = np.argmin(abs(ds.ranges.data-range_offset))+1
-                # set arrays for calculation simplicity
-                r = ds.ranges[start_point:].data - range_offset
-                az = ds.azimuth.data
-                el = ds.elevation.data
-                vr = ds.dpl[:,0,start_point:].data
-                # calculate vertical vorticity
-                vort_z = ( (vr[1:,:] - vr[:-1,:]) / (np.deg2rad(az[1:]) - np.deg2rad(az[:-1]))[:,np.newaxis] ) * (1 / r)
-                
-                # create dictionary to store lidar file
-                lidar = {
-                    # lidar information
-                    'ob_method' : ds.attrs['observation_method'],
-                    'serial_number' : ds.attrs['serial_number'],
-                    'lat' : ds.latitude.data,
-                    'lon' : ds.longitude.data,
-                    'altitude' : ds.altitude.data,
-                    # scan setting information
-                    'rpm_azimuth' : ds.rpm_azimuth[start_point:].data,
-                    # scan dimensions
-                    'r' : r,
-                    'az' : az,
-                    'el' : el,
-                    # important observations
-                    'vr' : vr,
-                    'vort_z' : vort_z,
-                    'pwr' : ds.pwr[:,0,start_point:].data * 100,
-                    'snr' : ds.snr[:,0,start_point:].data,
-                    'sw' : ds.wth[:,0,start_point:].data,
-                    # other observations
-                    'noise_level' : ds.noise_level[:,0,start_point:].data,
-                    # 'power_spectra' : ds.power_spectra[:,0,start_point:].data,
-                    'doppler_velocity' : ds.doppler_velocity.data,
-                    # scan time information
-                    'record_start_time' : ds.start_time.data,
-                    'start_time' : ds.attrs['start_time'][11:19],
-                    'start_date' : ds.attrs['start_time'][:10],
-                    'end_time' : ds.attrs['end_time'][11:19],
-                    'end_date' : ds.attrs['end_time'][:10]
-                        }
-                
-                lall.append(lidar)
-                ds.close()
-
+        # with gzip.open(file_path, 'rb') as f:
+        ds = xr.open_dataset(file_path)
+    
+        # check scan is good
+        if (ds.ntime.size > 100) and (ds.nrange.size > 100) and (ds.elevation[0].data > des_elev-1. and ds.elevation[0].data < des_elev+1.):
+            print(f"Reading {filename}")
+            # oversampling_ratio = ds.attrs['oversampling_ratio']  
+            start_point = np.argmin(abs(ds.ranges.data-range_offset))+1
+            # set arrays for calculation simplicity
+            r = ds.ranges[start_point:].data - range_offset
+            az = ds.azimuth.data
+            el = ds.elevation.data
+            vr = ds.dpl[:,0,start_point:].data
+            # calculate vertical vorticity
+            vort_z = ( (vr[1:,:] - vr[:-1,:]) / (np.deg2rad(az[1:]) - np.deg2rad(az[:-1]))[:,np.newaxis] ) * (1 / r)
+            
+            # create dictionary to store lidar file
+            lidar = {
+                # lidar information
+                'ob_method' : ds.attrs['observation_method'],
+                'serial_number' : ds.attrs['serial_number'],
+                'lat' : ds.latitude.data,
+                'lon' : ds.longitude.data,
+                'altitude' : ds.altitude.data,
+                # scan setting information
+                'rpm_azimuth' : ds.rpm_azimuth[start_point:].data,
+                # scan dimensions
+                'r' : r,
+                'az' : az,
+                'el' : el,
+                # important observations
+                'vr' : vr,
+                'vort_z' : vort_z,
+                'pwr' : ds.pwr[:,0,start_point:].data * 100,
+                'snr' : ds.snr[:,0,start_point:].data,
+                'sw' : ds.wth[:,0,start_point:].data,
+                # other observations
+                'noise_level' : ds.noise_level[:,0,start_point:].data,
+                # 'power_spectra' : ds.power_spectra[:,0,start_point:].data,
+                'doppler_velocity' : ds.doppler_velocity.data,
+                # scan time information
+                'record_start_time' : ds.start_time.data,
+                'start_time' : ds.attrs['start_time'][11:19],
+                'start_date' : ds.attrs['start_time'][:10],
+                'end_time' : ds.attrs['end_time'][11:19],
+                'end_date' : ds.attrs['end_time'][:10]
+                    }
+            
+            lall.append(lidar)
+            ds.close()
+print(len(lall))
 # --------------------------
 # filter vertical vorticity field
 if filter_vort:
@@ -245,6 +245,7 @@ for i, (l,R) in enumerate(zip(lall,autocorr_2D)):
 
     plt.suptitle(f"{lidar_loc} MetroWeather CDL {l['start_date']} {l['start_time']} UTC ({round(l['el'][0],1)}$^{{\\circ}}$ Elevation)", 
                 fontweight="bold", fontsize=25, y=0.925)
+    
     fig.tight_layout()
     
     if filter_vort:
@@ -252,3 +253,4 @@ for i, (l,R) in enumerate(zip(lall,autocorr_2D)):
     else:
         dout = f"{figdir}vort_vortautocorr_{l['start_date']}T{l['start_time']}.png"
     plt.savefig(dout)
+    print(f"Figure saved to: {dout}")
