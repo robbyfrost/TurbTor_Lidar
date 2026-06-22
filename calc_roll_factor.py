@@ -14,7 +14,7 @@ import xrft
 import matplotlib.pyplot as plt
 from matplotlib import rc
 from matplotlib.ticker import MultipleLocator
-from functions import *
+from Analysis.TurbTor_Lidar.lidar_functions import *
 
 # --------------------------
 # settings

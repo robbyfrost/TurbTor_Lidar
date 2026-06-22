@@ -1,5 +1,6 @@
-import imageio
+import imageio.v2 as imageio
 import os
+import glob
 
 def create_gif(naming_con, input_folder, dout, duration, step):
     """
@@ -14,20 +15,20 @@ def create_gif(naming_con, input_folder, dout, duration, step):
     """
     # Collect image file paths from the input folder
     images = []
-    file_list = sorted(os.listdir(input_folder))
+    file_list = sorted(glob.glob(f"{input_folder}*.png"))
     selected_files = file_list[::step]  # Select every nth file
+
     for file_name in selected_files:
-        if file_name.startswith(naming_con):
-            file_path = os.path.join(input_folder, file_name)
-            print(file_path)
-            images.append(imageio.imread(file_path))
+        images.append(imageio.imread(file_name))
+
     # Create the GIF with per-frame duration
-    imageio.mimsave(dout, images, duration=duration, loop=0)
+    imageio.mimsave(f"{dout}{naming_con}.gif", images, duration=duration, loop=1)
 
-naming_con = "refl_worms"
-input_folder = "/data/arrcwx/robbyfrost/cm1_output/cm1_supercell_75m_turb/storm_1min_out/"
-dout = input_folder
-duration = 100
-step = 1
+# naming_con = "20260414_D2"
+# input_folder = "/home/robbyfrost/Figures/MW/truck/20260414/"
+# dout = input_folder
+# duration = 300
+# step = 1
 
-create_gif(naming_con, input_folder, dout, duration, step)
+# create_gif(naming_con, input_folder, dout, duration, step)
+# print(f"Output to: {dout}{naming_con}.gif")
